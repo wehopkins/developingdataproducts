@@ -5,7 +5,16 @@ require(pamr)
 require(kernlab)
 require(cluster)
 require(survival)
+require(MASS)
+require(klaR)
+require(earth)
+require(plotmo)
+require(plotrix)
+require(TeachingDemos)
+require(mda)
+require(class)
 require(shiny)
+require(knitr)
 require(caret)
 require(readr)
 require(dplyr)
@@ -18,7 +27,8 @@ shinyServer(function(input,output) {
     dataSet <- function() {
         if (is.null(data_set)) {
             audit.df <- read_csv("audit.csv")
-            audit.df <- audit.df%>%mutate(TARGET_Adjusted=factor(TARGET_Adjusted))
+            audit.df <- audit.df%>%mutate(TARGET_Adjusted=factor(TARGET_Adjusted))%>%
+                dplyr::select(-ID,-RISK_Adjustment)
             data_set <<- audit.df
         }
         data_set
@@ -57,15 +67,45 @@ shinyServer(function(input,output) {
         model_list
     })
     
+    nzvCols <- function(data.df) {
+        nzv.indices <- nearZeroVar(data.df)
+        if (length(nzv.indices>0)) {
+            nzv_cols <- names(data.df)[nzv.indices]
+            return(paste0("-",nzv_cols))
+        }
+        
+        NULL
+    }
+    
+    type_to_nzv <- c("knn","nb","pam")
+    
+    typeToFilter <- function(model_type,data.df) {
+        if (model_type%in%type_to_nzv) {
+            nzv_cols <- nzvCols(data.df)
+            return(data.df%>%select_(.dots=nzv_cols))
+        }
+        data.df
+    }
+    
+    type_to_preprocess <- list("svmRadial"=c("center","scale"),
+                               "knn"=c("center","scale"))
+    
+    typeToPreprocess <- function(model_type) {
+        if (model_type%in%names(type_to_preprocess)) {
+            return(type_to_preprocess[[model_type]])
+        }
+        NULL
+    }
+    
     currentModel <- reactive ({
         model_type <- input$model_type
         set.seed(20160420)
         model_obj <- train(form=TARGET_Adjusted~.,
-                           data=dataSet()%>%dplyr::select(-RISK_Adjustment),
+                           data=typeToFilter(model_type,dataSet()),
                            method=model_type,
                            trControl=trainControlFunc(input$train_method),
-                           tuneLength=input$tune_length)
-        
+                           tuneLength=input$tune_length,
+                           preProcess=typeToPreprocess(model_type))
         
         model_obj
     })
@@ -87,15 +127,15 @@ shinyServer(function(input,output) {
     ## Compare Models page
     ##
     
-    output$model_list_view <- renderPrint({
-        data_frame(models=vapply(modelList(),FUN.VALUE=character(1),FUN=function(l) l$model_type))
+    output$model_list_view <- renderTable({
+        data_frame("models built"=vapply(modelList(),FUN.VALUE=character(1),FUN=function(l) l$model_type))
     })
     
     resamplingResults <- reactive ({
         the_model_list <- modelList()
-        if(length(the_model_list)<2) {
-            return(NULL)
-        }
+        validate(need(length(the_model_list)>1,
+                      message="Must have at least two models built to run comparisons.")
+        )
         the_models <- lapply(the_model_list,function(l) l$model)
         the_model_names <- vapply(the_models,FUN.VALUE=character(1),FUN=function(m) m$method)
         resamples(the_models,modelNames=the_model_names)
@@ -103,18 +143,24 @@ shinyServer(function(input,output) {
     
     output$model_statistics <- renderPrint({
         resampling_results <- resamplingResults()
-        if (is.null(resampling_results)) {
-            return("Must have at least two models built to run comparisons.")
-        }
         summary(resampling_results)
+    })
+    
+    output$model_stats_plot <- renderPlot({
+        resampling_results <- resamplingResults()
+        dotplot(resampling_results)
+        
     })
     
     output$model_comparison_text <- renderPrint({
         resampling_results <- resamplingResults()
-        if (is.null(resampling_results)) {
-            return("Must have at least two models built to run comparisons.")
-        }
         summary(diff(resampling_results))
     })
+  
+    output$model_comparison_plot <- renderPlot({
+        resampling_results <- resamplingResults()
+        dotplot(diff(resampling_results))
+    })
     
+      
 })

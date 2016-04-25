@@ -10,7 +10,6 @@ shinyUI(
             "Build Models",
             fluidPage(
                 fluidRow(
-                    h5("Specify Training Control"),
                     column(5,
                            selectInput("train_method","training method",
                                        choices=list(
@@ -38,12 +37,13 @@ shinyUI(
                                        ),
                                        selected="ctree"
                            ),
-                           h5("tuning parameters"),
-                           numericInput("tune_length","count of values",value=3,
+                           numericInput("tune_length","# of tunable values",value=3,
                                         min=1,max=10,step=1),
                            submitButton("Train Model"),
                            br(),
-                           verbatimTextOutput("model_confusion_matrix")
+                           verbatimTextOutput("model_confusion_matrix"),
+                           br(),
+                           tableOutput("model_list_view")
                            
                     ),
                     column(7,
@@ -58,11 +58,29 @@ shinyUI(
         tabPanel(
             "Compare Models",
             fluidPage(
-                column(3,
-                       verbatimTextOutput("model_list_view")
+                fluidRow(
+                    column(5,h3("Per Model Performance Statistics"),offset=3)
                 ),
-                column(5,
-                       verbatimTextOutput("model_statistics"))
-            ))
+                fluidRow(
+                    column(5,
+                           verbatimTextOutput("model_statistics")
+                    ),
+                    column(5,
+                           plotOutput("model_stats_plot")
+                    )
+                ),
+                fluidRow(
+                    column(5,h3("Pair-Wise Model Performance Comparison"),offset=3)
+                ),
+                fluidRow(
+                    column(5,
+                           verbatimTextOutput("model_comparison_text")
+                    ),
+                    column(5,
+                           plotOutput("model_comparison_plot")
+                    )
+                )
+            )
+        )
     )
 )
