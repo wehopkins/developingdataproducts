@@ -46,7 +46,7 @@ Workflow divided between Build Models and Compare Models
 * Compare Models
     + Need two models to compare
     
-[Try it out](something)
+[Try it out](https://wehopkins.shinyapps.io/developingdataproducts/)
 
 
 Further Work
